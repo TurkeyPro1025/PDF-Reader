@@ -4,32 +4,23 @@
   "description": "PDF Reader App based on uni-app",
   "main": "main.js",
   "scripts": {
-    "serve": "vue-cli-service serve",
-    "build": "vue-cli-service build",
-    "dev:h5": "vue-cli-service uni-serve --mode h5",
-    "build:h5": "vue-cli-service uni-build --mode h5",
-    "dev:mp-weixin": "vue-cli-service uni-serve --mode mp-weixin",
-    "build:mp-weixin": "vue-cli-service uni-build --mode mp-weixin"
+    "dev:h5": "uni",
+    "build:h5": "uni build",
+    "dev:mp-weixin": "uni -p mp-weixin",
+    "build:mp-weixin": "uni build -p mp-weixin"
   },
   "dependencies": {
-    "@dcloudio/uni-app": "^2.0.2-5000720260410001",
-    "@dcloudio/uni-h5": "^2.0.2-5000720260410001",
+    "@dcloudio/uni-app": "3.0.0-5000720260410001",
+    "@dcloudio/uni-h5": "3.0.0-5000720260410001",
+    "@dcloudio/uni-mp-weixin": "3.0.0-5000720260410001",
+    "@dcloudio/vite-plugin-uni": "3.0.0-5000720260410001",
     "axios": "^1.6.0",
     "pdfjs-dist": "^3.11.174",
-    "vuex": "^3.6.2"
+    "vue": "3.4.21",
+    "vuex": "^4.1.0"
   },
-
   "devDependencies": {
-    "@dcloudio/uni-cli-i18n": "^2.0.2-5000720260410001",
-    "@dcloudio/uni-cli-shared": "^2.0.2-5000720260410001",
-    "@dcloudio/webpack-uni-pages-loader": "^2.0.2-5000720260410001",
-    "@vue/cli-plugin-babel": "~5.0.0",
-    "@vue/cli-plugin-eslint": "~5.0.0",
-    "@vue/cli-service": "~5.0.0",
-    "babel-eslint": "^10.1.0",
-    "eslint": "^7.32.0",
-    "eslint-plugin-vue": "^7.20.0",
-    "vue-template-compiler": "^2.6.14"
+    "vite": "5.2.8"
   },
   "keywords": [],
   "author": "",

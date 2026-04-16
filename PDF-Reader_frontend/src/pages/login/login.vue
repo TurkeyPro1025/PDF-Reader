@@ -21,7 +21,7 @@
 </template>
 
 <script>
-import axios from 'axios'
+import { post, getErrorMessage } from '../../utils/http'
 
 export default {
   data() {
@@ -35,20 +35,20 @@ export default {
   methods: {
     async login() {
       try {
-        const response = await axios.post('/api/auth/login', this.form)
-        const { user, token } = response.data
+        const data = await post('/api/auth/login', this.form)
+        const { user, token } = data
         this.$store.dispatch('login', { user, token })
         uni.switchTab({ url: '/pages/profile/profile' })
       } catch (error) {
-        uni.showToast({ title: '登录失败', icon: 'none' })
+        uni.showToast({ title: getErrorMessage(error, '登录失败'), icon: 'none' })
       }
     },
     async register() {
       try {
-        const response = await axios.post('/api/auth/register', this.form)
+        await post('/api/auth/register', this.form)
         uni.showToast({ title: '注册成功', icon: 'success' })
       } catch (error) {
-        uni.showToast({ title: '注册失败', icon: 'none' })
+        uni.showToast({ title: getErrorMessage(error, '注册失败'), icon: 'none' })
       }
     }
   }

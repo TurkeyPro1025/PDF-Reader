@@ -54,6 +54,11 @@
         "setting" : {
             "urlCheck" : false
         },
+        "networkTimeout" : {
+            "request" : 15000,
+            "uploadFile" : 60000,
+            "downloadFile" : 60000
+        },
         "usingComponents" : true
     },
     "mp-alipay" : {
@@ -68,5 +73,5 @@
     "uniStatistics" : {
         "enable" : false
     },
-    "vueVersion" : "2"
+    "vueVersion" : "3"
 }

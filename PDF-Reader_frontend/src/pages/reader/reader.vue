@@ -90,8 +90,11 @@
 </template>
 
 <script>
+import { get, getErrorMessage } from '../../utils/http'
+// #ifdef H5
 import * as pdfjsLib from 'pdfjs-dist'
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.entry'
+// #endif
 
 export default {
   data() {
@@ -139,15 +142,20 @@ export default {
   },
   methods: {
     async loadPDF() {
+      // #ifndef H5
+      uni.showToast({ title: '小程序端暂不支持PDF渲染，请使用H5访问', icon: 'none' })
+      return
+      // #endif
+
       try {
         pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
-        
-        const response = await fetch(`/api/pdf/${this.pdfId}`, {
-          headers: {
+
+        const data = await get(`/api/pdf/${this.pdfId}`, {
+          header: {
             'Authorization': `Bearer ${this.$store.state.token}`
-          }
+          },
+          timeout: 15000
         })
-        const data = await response.json()
         const pdfUrl = `/uploads/${data.pdf.filename}`
         
         const loadingTask = pdfjsLib.getDocument(pdfUrl)
@@ -166,11 +174,14 @@ export default {
         }
       } catch (error) {
         console.error('加载PDF失败:', error)
-        uni.showToast({ title: '加载PDF失败', icon: 'none' })
+        uni.showToast({ title: getErrorMessage(error, '加载PDF失败'), icon: 'none' })
       }
     },
     async renderPage(pageNum) {
       try {
+        // #ifndef H5
+        return
+        // #endif
         const page = await this.pdfDoc.getPage(pageNum)
         const canvas = document.getElementById(`page-${pageNum}`)
         if (!canvas) return
@@ -248,6 +259,11 @@ export default {
     },
     // 朗读功能
     async toggleTTS() {
+      // #ifndef H5
+      uni.showToast({ title: '小程序端暂不支持语音朗读', icon: 'none' })
+      return
+      // #endif
+
       if (this.isPlaying) {
         // 暂停朗读
         if (this.speechInstance) {
@@ -261,6 +277,11 @@ export default {
       this.isPlaying = !this.isPlaying
     },
     stopTTS() {
+      // #ifndef H5
+      this.isPlaying = false
+      return
+      // #endif
+
       if (this.speechInstance) {
         this.speechInstance.cancel()
       }
@@ -290,6 +311,11 @@ export default {
       }
     },
     speakText(text) {
+      // #ifndef H5
+      uni.showToast({ title: '当前设备不支持语音朗读', icon: 'none' })
+      return
+      // #endif
+
       if ('speechSynthesis' in window) {
         const utterance = new SpeechSynthesisUtterance(text)
         utterance.rate = this.speechRate

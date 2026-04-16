@@ -1,0 +1,21 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/login/login",
+    "pages/profile/profile",
+    "pages/upload/upload",
+    "pages/reader/reader"
+  ],
+  "window": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "PDF Reader",
+    "navigationBarBackgroundColor": "#ffffff",
+    "backgroundColor": "#f5f5f5"
+  },
+  "networkTimeout": {
+    "request": 15000,
+    "uploadFile": 60000,
+    "downloadFile": 60000
+  },
+  "usingComponents": {}
+}

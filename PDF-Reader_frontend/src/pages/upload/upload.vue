@@ -32,7 +32,7 @@
 </template>
 
 <script>
-import axios from 'axios'
+import { buildApiUrl, get, getErrorMessage } from '../../utils/http'
 
 export default {
   data() {
@@ -40,7 +40,8 @@ export default {
       file: null,
       uploading: false,
       progress: 0,
-      pdfList: []
+      pdfList: [],
+      currentUploadTask: null
     }
   },
   onLoad() {
@@ -64,49 +65,65 @@ export default {
     },
     async uploadFile() {
       if (!this.file) return
-      
+
       this.uploading = true
       this.progress = 0
-      
+
       try {
-        const formData = new FormData()
-        formData.append('pdf', this.file)
-        
-        const response = await axios.post('/api/pdf/upload', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-            'Authorization': `Bearer ${this.$store.state.token}`
-          },
-          onUploadProgress: (progressEvent) => {
-            this.progress = Math.round((progressEvent.loaded * 100) / progressEvent.total)
-          }
+        const uploadRes = await new Promise((resolve, reject) => {
+          const uploadTask = uni.uploadFile({
+            url: buildApiUrl('/api/pdf/upload'),
+            filePath: this.file.path || this.file.tempFilePath,
+            name: 'pdf',
+            timeout: 60000,
+            header: {
+              'Authorization': `Bearer ${this.$store.state.token}`
+            },
+            success: (res) => resolve(res),
+            fail: (err) => reject(err || { errMsg: 'uploadFile:fail unknown error' })
+          })
+
+          this.currentUploadTask = uploadTask
+          uploadTask.onProgressUpdate((res) => {
+            this.progress = res.progress
+          })
         })
-        
-        uni.showToast({ title: '上传成功', icon: 'success' })
-        this.file = null
-        this.getPDFList()
+
+        if (uploadRes.statusCode >= 200 && uploadRes.statusCode < 300) {
+          uni.showToast({ title: '上传成功', icon: 'success' })
+          this.file = null
+          this.getPDFList()
+        } else {
+          uni.showToast({ title: '上传失败', icon: 'none' })
+        }
       } catch (error) {
-        uni.showToast({ title: '上传失败', icon: 'none' })
+        uni.showToast({ title: getErrorMessage(error, '上传失败'), icon: 'none' })
       } finally {
+        this.currentUploadTask = null
         this.uploading = false
         this.progress = 0
       }
     },
     cancelUpload() {
-      // 取消上传逻辑
+      if (this.currentUploadTask) {
+        this.currentUploadTask.abort()
+      }
       this.uploading = false
       this.progress = 0
+      this.currentUploadTask = null
     },
     async getPDFList() {
       try {
-        const response = await axios.get('/api/pdf/list', {
-          headers: {
+        const data = await get('/api/pdf/list', {
+          header: {
             'Authorization': `Bearer ${this.$store.state.token}`
-          }
+          },
+          timeout: 15000
         })
-        this.pdfList = response.data.pdfs
+        this.pdfList = data.pdfs || []
       } catch (error) {
         console.error('获取PDF列表失败:', error)
+        uni.showToast({ title: getErrorMessage(error, '获取PDF列表失败'), icon: 'none' })
       }
     },
     openPDF(pdf) {
