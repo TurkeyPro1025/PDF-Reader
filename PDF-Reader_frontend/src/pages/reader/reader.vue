@@ -1,26 +1,21 @@
 <template>
-  <view class="reader-container" :style="{ backgroundColor: backgroundColor }">
-    <!-- 自定义导航栏 -->
+  <view class="reader-container" :style="{ backgroundColor }">
     <view class="navbar">
       <button @click="goBack" class="back-btn">←</button>
-      <text class="title">{{ pdfName }}</text>
+      <text class="title">{{ pdfName || '阅读器' }}</text>
       <button @click="showMenu = !showMenu" class="menu-btn">☰</button>
     </view>
-    
-    <!-- 阅读区域 -->
+
     <view class="content">
-      <view v-for="page in pages" :key="page" class="page-container">
-        <canvas :id="'page-' + page" class="pdf-page"></canvas>
-      </view>
+      <canvas id="pdf-page" class="pdf-page"></canvas>
     </view>
-    
-    <!-- 菜单面板 -->
+
     <view v-if="showMenu" class="menu-panel" :style="{ backgroundColor: menuBackgroundColor }">
       <view class="menu-section">
         <text class="menu-section-title">字体设置</text>
         <view class="font-options">
-          <button 
-            v-for="font in fonts" 
+          <button
+            v-for="font in fonts"
             :key="font"
             @click="setFont(font)"
             :class="{ active: currentFont === font }"
@@ -35,12 +30,12 @@
           <button @click="increaseFontSize" class="size-btn">A+</button>
         </view>
       </view>
-      
+
       <view class="menu-section">
         <text class="menu-section-title">背景设置</text>
         <view class="background-options">
-          <view 
-            v-for="(color, index) in backgroundColors" 
+          <view
+            v-for="(color, index) in backgroundColors"
             :key="index"
             @click="setBackground(index)"
             :class="{ active: currentBackground === index }"
@@ -49,7 +44,7 @@
           ></view>
         </view>
       </view>
-      
+
       <view class="menu-section">
         <text class="menu-section-title">书签</text>
         <button @click="addBookmark" class="bookmark-btn">添加书签</button>
@@ -60,13 +55,11 @@
           </view>
         </view>
       </view>
-      
+
       <view class="menu-section">
         <text class="menu-section-title">朗读设置</text>
         <view class="tts-controls">
-          <button @click="toggleTTS" class="tts-btn">
-            {{ isPlaying ? '暂停' : '开始朗读' }}
-          </button>
+          <button @click="toggleTTS" class="tts-btn">{{ isPlaying && !isPaused ? '暂停' : '开始朗读' }}</button>
           <button @click="stopTTS" class="tts-btn">停止</button>
         </view>
         <view class="tts-settings">
@@ -76,21 +69,20 @@
           <slider @change="setSpeechVolume" :value="speechVolume" :min="0" :max="1" :step="0.1" />
         </view>
       </view>
-      
+
       <button @click="showMenu = false" class="close-btn">关闭</button>
     </view>
-    
-    <!-- 底部控制栏 -->
+
     <view class="bottom-bar">
       <button @click="prevPage" class="control-btn">上一页</button>
-      <text class="page-info">{{ currentPage }} / {{ totalPages }}</text>
+      <text class="page-info">{{ currentPage }} / {{ totalPages || 1 }}</text>
       <button @click="nextPage" class="control-btn">下一页</button>
     </view>
   </view>
 </template>
 
 <script>
-import { get, getErrorMessage } from '../../utils/http'
+import { buildAssetUrl, get, getErrorMessage, put } from '../../utils/http'
 // #ifdef H5
 import * as pdfjsLib from 'pdfjs-dist'
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.entry'
@@ -102,29 +94,26 @@ export default {
       pdfId: '',
       pdfName: '',
       pdfDoc: null,
-      pages: [],
       currentPage: 1,
       totalPages: 0,
       showMenu: false,
-      // 字体设置
       fonts: ['默认', '宋体', '黑体'],
       currentFont: '默认',
       fontSize: 16,
-      // 背景设置
       backgroundColors: [
         { name: '默认', value: '#ffffff' },
-        { name: '护眼', value: '#e6e6fa' },
+        { name: '护眼', value: '#eef8ea' },
         { name: '夜间', value: '#1a1a1a' },
-        { name: ' sepia', value: '#f5f5dc' }
+        { name: '复古', value: '#f5ecd9' }
       ],
       currentBackground: 0,
-      // 书签
-      bookmarks: [],
-      // 朗读功能
+      localBookmarks: [],
       isPlaying: false,
+      isPaused: false,
       speechRate: 1.0,
       speechVolume: 1.0,
-      speechInstance: null
+      speechInstance: null,
+      isSyncing: false
     }
   },
   computed: {
@@ -133,112 +122,180 @@ export default {
     },
     menuBackgroundColor() {
       return this.currentBackground === 2 ? '#2a2a2a' : '#ffffff'
+    },
+    bookmarks() {
+      return this.localBookmarks
     }
   },
   onLoad(options) {
-    this.pdfId = options.id
-    this.pdfName = options.name
+    this.pdfId = options.id || ''
+    this.pdfName = options.name || ''
+    if (!this.ensureLoggedIn()) {
+      return
+    }
     this.loadPDF()
   },
+  onUnload() {
+    this.stopTTS()
+  },
   methods: {
+    ensureLoggedIn() {
+      if (this.$store.getters.isLoggedIn) {
+        return true
+      }
+      uni.showToast({ title: '请先登录', icon: 'none' })
+      uni.reLaunch({ url: '/pages/login/login' })
+      return false
+    },
+    resolveBookFileUrl(book) {
+      if (!book) {
+        return ''
+      }
+      if (book.fileUrl) {
+        return buildAssetUrl(book.fileUrl)
+      }
+      if (book.path) {
+        return buildAssetUrl(`/${String(book.path).replace(/^\/+/, '').replace(/\\/g, '/')}`)
+      }
+      if (book.filename) {
+        return buildAssetUrl(`/uploads/${book.filename}`)
+      }
+      return ''
+    },
     async loadPDF() {
       // #ifndef H5
       uni.showToast({ title: '小程序端暂不支持PDF渲染，请使用H5访问', icon: 'none' })
       return
       // #endif
 
+      if (!this.pdfId) {
+        uni.showToast({ title: '缺少图书信息', icon: 'none' })
+        return
+      }
+
       try {
         pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
-        const data = await get(`/api/pdf/${this.pdfId}`, {
+        const data = await get(`/api/books/${this.pdfId}/read`, {
           header: {
-            'Authorization': `Bearer ${this.$store.state.token}`
+            Authorization: `Bearer ${this.$store.state.token}`
           },
           timeout: 15000
         })
-        const pdfUrl = `/uploads/${data.pdf.filename}`
-        
+
+        const pdfUrl = this.resolveBookFileUrl(data.book)
+        if (!pdfUrl) {
+          throw new Error('图书文件地址无效')
+        }
+
+        this.pdfName = data.book.title || this.pdfName
+        this.localBookmarks = data.readingState?.bookmarks || []
+
         const loadingTask = pdfjsLib.getDocument(pdfUrl)
         this.pdfDoc = await loadingTask.promise
         this.totalPages = this.pdfDoc.numPages
-        this.pages = Array.from({ length: this.totalPages }, (_, i) => i + 1)
-        
-        // 渲染第一页
-        this.renderPage(1)
-        
-        // 恢复阅读进度
-        const savedProgress = this.$store.getters.getReadingProgress(this.pdfId)
-        if (savedProgress > 0) {
-          this.currentPage = Math.round(savedProgress * this.totalPages)
-          this.renderPage(this.currentPage)
-        }
+        this.currentPage = Math.min(
+          this.totalPages,
+          Math.max(1, data.readingState?.lastPage || 1)
+        )
+
+        await this.renderCurrentPage()
       } catch (error) {
         console.error('加载PDF失败:', error)
         uni.showToast({ title: getErrorMessage(error, '加载PDF失败'), icon: 'none' })
       }
     },
-    async renderPage(pageNum) {
+    async renderCurrentPage() {
       try {
         // #ifndef H5
         return
         // #endif
-        const page = await this.pdfDoc.getPage(pageNum)
-        const canvas = document.getElementById(`page-${pageNum}`)
-        if (!canvas) return
-        
+        if (!this.pdfDoc) {
+          return
+        }
+
+        await this.$nextTick()
+
+        const page = await this.pdfDoc.getPage(this.currentPage)
+        const canvas = document.getElementById('pdf-page')
+        if (!canvas) {
+          return
+        }
+
+        const containerWidth = Math.max(window.innerWidth - 32, 320)
+        const unscaledViewport = page.getViewport({ scale: 1 })
+        const scale = Math.min(2, Math.max(1, containerWidth / unscaledViewport.width))
+        const viewport = page.getViewport({ scale })
         const ctx = canvas.getContext('2d')
-        const viewport = page.getViewport({ scale: 1.5 })
-        
+
         canvas.width = viewport.width
         canvas.height = viewport.height
-        
-        const renderContext = {
+
+        await page.render({
           canvasContext: ctx,
-          viewport: viewport
-        }
-        
-        await page.render(renderContext).promise
-        
-        // 保存阅读进度
-        const progress = pageNum / this.totalPages
-        this.$store.dispatch('saveReadingProgress', { pdfId: this.pdfId, progress })
+          viewport
+        }).promise
+
+        await this.syncReadingState()
       } catch (error) {
         console.error('渲染页面失败:', error)
       }
     },
-    prevPage() {
-      if (this.currentPage > 1) {
-        this.currentPage--
-        this.renderPage(this.currentPage)
+    async syncReadingState() {
+      if (this.isSyncing || !this.pdfId) {
+        return
+      }
+
+      this.isSyncing = true
+      try {
+        await put(`/api/bookshelf/${this.pdfId}/progress`, {
+          progress: this.totalPages > 0 ? (this.currentPage / this.totalPages) * 100 : 0,
+          lastPage: this.currentPage,
+          bookmarks: this.localBookmarks
+        }, {
+          header: {
+            Authorization: `Bearer ${this.$store.state.token}`
+          }
+        })
+      } catch (error) {
+        console.error('同步阅读状态失败:', error)
+      } finally {
+        this.isSyncing = false
       }
     },
-    nextPage() {
-      if (this.currentPage < this.totalPages) {
-        this.currentPage++
-        this.renderPage(this.currentPage)
+    async prevPage() {
+      if (this.currentPage <= 1) {
+        return
       }
+      this.currentPage -= 1
+      await this.renderCurrentPage()
     },
-    goToPage(pageNum) {
-      if (pageNum >= 1 && pageNum <= this.totalPages) {
-        this.currentPage = pageNum
-        this.renderPage(this.currentPage)
-        this.showMenu = false
+    async nextPage() {
+      if (this.currentPage >= this.totalPages) {
+        return
       }
+      this.currentPage += 1
+      await this.renderCurrentPage()
+    },
+    async goToPage(pageNum) {
+      if (pageNum < 1 || pageNum > this.totalPages) {
+        return
+      }
+      this.currentPage = pageNum
+      this.showMenu = false
+      await this.renderCurrentPage()
     },
     setFont(font) {
       this.currentFont = font
-      // 这里可以实现字体切换逻辑
     },
     increaseFontSize() {
       if (this.fontSize < 24) {
-        this.fontSize++
-        // 这里可以实现字体大小调整逻辑
+        this.fontSize += 1
       }
     },
     decreaseFontSize() {
       if (this.fontSize > 12) {
-        this.fontSize--
-        // 这里可以实现字体大小调整逻辑
+        this.fontSize -= 1
       }
     },
     setBackground(index) {
@@ -246,18 +303,54 @@ export default {
     },
     addBookmark() {
       const bookmark = {
-        id: Date.now(),
+        id: String(Date.now()),
         page: this.currentPage,
-        pdfId: this.pdfId
+        label: `第 ${this.currentPage} 页`,
+        createdAt: new Date().toISOString()
       }
-      this.bookmarks.push(bookmark)
-      this.$store.commit('addBookmark', bookmark)
-      uni.showToast({ title: '书签添加成功', icon: 'success' })
+      const exists = this.localBookmarks.some((item) => item.page === bookmark.page)
+      if (!exists) {
+        this.localBookmarks = [...this.localBookmarks, bookmark]
+        this.syncReadingState()
+      }
+      uni.showToast({ title: exists ? '该页已存在书签' : '书签添加成功', icon: 'none' })
     },
     goBack() {
       uni.navigateBack()
     },
-    // 朗读功能
+    async getPageText(pageNum) {
+      // #ifndef H5
+      return ''
+      // #endif
+      if (!this.pdfDoc) {
+        return ''
+      }
+
+      const page = await this.pdfDoc.getPage(pageNum)
+      const textContent = await page.getTextContent()
+      return textContent.items.map((item) => item.str).join(' ')
+    },
+    speakText(text) {
+      // #ifndef H5
+      return
+      // #endif
+      if (!window.speechSynthesis) {
+        uni.showToast({ title: '当前浏览器不支持语音朗读', icon: 'none' })
+        return
+      }
+
+      this.stopTTS()
+      this.speechInstance = new SpeechSynthesisUtterance(text || '当前页面无可朗读文本')
+      this.speechInstance.rate = this.speechRate
+      this.speechInstance.volume = this.speechVolume
+      this.speechInstance.onend = () => {
+        this.isPlaying = false
+        this.isPaused = false
+        this.speechInstance = null
+      }
+      window.speechSynthesis.speak(this.speechInstance)
+      this.isPlaying = true
+    },
     async toggleTTS() {
       // #ifndef H5
       uni.showToast({ title: '小程序端暂不支持语音朗读', icon: 'none' })
@@ -265,86 +358,49 @@ export default {
       // #endif
 
       if (this.isPlaying) {
-        // 暂停朗读
-        if (this.speechInstance) {
-          this.speechInstance.pause()
+        if (this.isPaused) {
+          window.speechSynthesis.resume()
+          this.isPaused = false
+        } else {
+          window.speechSynthesis.pause()
+          this.isPaused = true
         }
-      } else {
-        // 开始朗读
-        const text = await this.getPageText(this.currentPage)
-        this.speakText(text)
+        return
       }
-      this.isPlaying = !this.isPlaying
+
+      const text = await this.getPageText(this.currentPage)
+      this.speakText(text)
+      this.isPaused = false
     },
     stopTTS() {
-      // #ifndef H5
-      this.isPlaying = false
-      return
-      // #endif
-
-      if (this.speechInstance) {
-        this.speechInstance.cancel()
+      // #ifdef H5
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel()
       }
+      // #endif
       this.isPlaying = false
+      this.isPaused = false
+      this.speechInstance = null
     },
-    setSpeechRate(e) {
-      this.speechRate = e.detail.value
+    setSpeechRate(event) {
+      this.speechRate = Number(event?.detail?.value || 1)
       if (this.speechInstance) {
         this.speechInstance.rate = this.speechRate
       }
     },
-    setSpeechVolume(e) {
-      this.speechVolume = e.detail.value
+    setSpeechVolume(event) {
+      this.speechVolume = Number(event?.detail?.value || 1)
       if (this.speechInstance) {
         this.speechInstance.volume = this.speechVolume
-      }
-    },
-    async getPageText(pageNum) {
-      try {
-        const page = await this.pdfDoc.getPage(pageNum)
-        const content = await page.getTextContent()
-        const text = content.items.map(item => item.str).join(' ')
-        return text
-      } catch (error) {
-        console.error('获取页面文本失败:', error)
-        return ''
-      }
-    },
-    speakText(text) {
-      // #ifndef H5
-      uni.showToast({ title: '当前设备不支持语音朗读', icon: 'none' })
-      return
-      // #endif
-
-      if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(text)
-        utterance.rate = this.speechRate
-        utterance.volume = this.speechVolume
-        utterance.onend = () => {
-          // 朗读结束后自动朗读下一页
-          if (this.currentPage < this.totalPages) {
-            this.currentPage++
-            this.renderPage(this.currentPage)
-            this.getPageText(this.currentPage).then(nextText => {
-              this.speakText(nextText)
-            })
-          } else {
-            this.isPlaying = false
-          }
-        }
-        this.speechInstance = utterance
-        window.speechSynthesis.speak(utterance)
-      } else {
-        uni.showToast({ title: '当前设备不支持语音朗读', icon: 'none' })
       }
     }
   }
 }
 </script>
 
-<style scoped>
+<style>
 .reader-container {
-  height: 100vh;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
@@ -353,223 +409,132 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20rpx;
-  background-color: #f5f5f5;
-  border-bottom: 1rpx solid #ddd;
+  padding: 24rpx;
+  background: #111827;
+  color: #fff;
 }
 
-.back-btn, .menu-btn {
-  font-size: 32rpx;
-  background: none;
+.back-btn,
+.menu-btn,
+.control-btn,
+.font-btn,
+.size-btn,
+.bookmark-btn,
+.go-btn,
+.tts-btn,
+.close-btn {
+  background: #2563eb;
+  color: #fff;
   border: none;
-  padding: 10rpx;
+  border-radius: 12rpx;
 }
 
 .title {
-  font-size: 32rpx;
-  font-weight: bold;
   flex: 1;
   text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 30rpx;
+  font-weight: 700;
+  padding: 0 20rpx;
 }
 
 .content {
   flex: 1;
-  overflow-y: auto;
-  padding: 20rpx;
-}
-
-.page-container {
-  margin-bottom: 20rpx;
-  text-align: center;
+  overflow: auto;
+  padding: 16rpx;
 }
 
 .pdf-page {
-  max-width: 100%;
-  height: auto;
+  width: 100%;
+  background: #fff;
+  border-radius: 16rpx;
+  box-shadow: 0 12rpx 24rpx rgba(15, 23, 42, 0.08);
 }
 
 .menu-panel {
   position: fixed;
-  top: 0;
-  right: 0;
-  width: 70%;
-  height: 100vh;
-  z-index: 999;
-  padding: 40rpx;
-  box-shadow: -5rpx 0 15rpx rgba(0, 0, 0, 0.1);
+  right: 24rpx;
+  top: 120rpx;
+  width: 680rpx;
+  max-width: calc(100vw - 48rpx);
+  max-height: calc(100vh - 220rpx);
   overflow-y: auto;
+  padding: 24rpx;
+  border-radius: 24rpx;
+  box-shadow: 0 16rpx 40rpx rgba(15, 23, 42, 0.18);
+  z-index: 20;
 }
 
 .menu-section {
-  margin-bottom: 40rpx;
+  margin-bottom: 24rpx;
 }
 
 .menu-section-title {
+  display: block;
   font-size: 28rpx;
-  font-weight: bold;
-  margin-bottom: 20rpx;
-  color: #333;
+  font-weight: 700;
+  margin-bottom: 16rpx;
 }
 
-.font-options {
+.font-options,
+.background-options,
+.tts-controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 10rpx;
-  margin-bottom: 20rpx;
+  gap: 12rpx;
 }
 
-.font-btn {
-  padding: 10rpx 20rpx;
-  border: 1rpx solid #ddd;
-  border-radius: 8rpx;
-  font-size: 24rpx;
-  background-color: #f5f5f5;
+.font-size,
+.tts-settings {
+  margin-top: 16rpx;
 }
 
-.font-btn.active {
-  background-color: #4CAF50;
-  color: white;
-  border-color: #4CAF50;
-}
-
-.font-size {
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  margin-top: 20rpx;
-}
-
-.size-btn {
-  padding: 10rpx 20rpx;
-  border: 1rpx solid #ddd;
-  border-radius: 8rpx;
-  font-size: 24rpx;
-  background-color: #f5f5f5;
-}
-
-.current-size {
-  font-size: 24rpx;
-  color: #333;
-}
-
-.background-options {
-  display: flex;
-  gap: 20rpx;
-  margin-top: 20rpx;
+.current-size,
+.setting-label,
+.bookmark-page {
+  display: block;
+  margin: 12rpx 0;
 }
 
 .background-item {
-  width: 60rpx;
-  height: 60rpx;
-  border-radius: 8rpx;
-  border: 2rpx solid #ddd;
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  border: 4rpx solid transparent;
 }
 
-.background-item.active {
-  border-color: #4CAF50;
-  box-shadow: 0 0 10rpx rgba(76, 175, 80, 0.5);
-}
-
-.bookmark-btn {
-  width: 100%;
-  padding: 20rpx;
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 8rpx;
-  font-size: 24rpx;
-  margin-bottom: 20rpx;
+.background-item.active,
+.font-btn.active {
+  outline: 4rpx solid #2563eb;
 }
 
 .bookmark-list {
-  margin-top: 20rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+  margin-top: 16rpx;
 }
 
 .bookmark-item {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 20rpx;
-  background-color: #f5f5f5;
-  border-radius: 8rpx;
-  margin-bottom: 10rpx;
-}
-
-.bookmark-page {
-  font-size: 24rpx;
-  color: #333;
-}
-
-.go-btn {
-  padding: 10rpx 20rpx;
-  background-color: #2196F3;
-  color: white;
-  border: none;
-  border-radius: 8rpx;
-  font-size: 20rpx;
-}
-
-.tts-controls {
-  display: flex;
-  gap: 20rpx;
-  margin-bottom: 20rpx;
-}
-
-.tts-btn {
-  flex: 1;
-  padding: 20rpx;
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 8rpx;
-  font-size: 24rpx;
-}
-
-.tts-settings {
-  margin-top: 20rpx;
-}
-
-.setting-label {
-  font-size: 24rpx;
-  color: #333;
-  display: block;
-  margin-bottom: 10rpx;
-}
-
-.close-btn {
-  width: 100%;
-  padding: 20rpx;
-  background-color: #f44336;
-  color: white;
-  border: none;
-  border-radius: 8rpx;
-  font-size: 24rpx;
-  margin-top: 40rpx;
+  justify-content: space-between;
+  padding: 16rpx;
+  background: rgba(148, 163, 184, 0.12);
+  border-radius: 16rpx;
 }
 
 .bottom-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20rpx;
-  background-color: #f5f5f5;
-  border-top: 1rpx solid #ddd;
-}
-
-.control-btn {
-  padding: 10rpx 20rpx;
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 8rpx;
-  font-size: 24rpx;
+  padding: 20rpx 24rpx 32rpx;
+  background: rgba(255, 255, 255, 0.92);
+  border-top: 1rpx solid #e5e7eb;
 }
 
 .page-info {
-  font-size: 24rpx;
-  color: #333;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #111827;
 }
 </style>

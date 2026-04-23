@@ -3,7 +3,7 @@
     {
       "path": "pages/index/index",
       "style": {
-        "navigationBarTitleText": "首页"
+        "navigationBarTitleText": "书架首页"
       }
     },
     {
@@ -21,7 +21,7 @@
     {
       "path": "pages/upload/upload",
       "style": {
-        "navigationBarTitleText": "上传PDF"
+        "navigationBarTitleText": "图书管理"
       }
     },
     {

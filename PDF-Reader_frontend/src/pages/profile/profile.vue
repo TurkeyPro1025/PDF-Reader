@@ -6,16 +6,23 @@
     </view>
     <view v-else class="user-info">
       <view class="user-avatar">
-        <text class="avatar-text">{{ currentUser.username.charAt(0).toUpperCase() }}</text>
+        <text class="avatar-text">{{ avatarText }}</text>
       </view>
       <view class="user-details">
         <text class="username">{{ currentUser.username }}</text>
-        <text class="email">{{ currentUser.email }}</text>
+        <text class="email">手机号：{{ currentUser.phone }}</text>
+        <text v-if="currentUser.email" class="email">邮箱：{{ currentUser.email }}</text>
+        <text class="role-tag">{{ isAdmin ? '管理员' : '普通用户' }}</text>
       </view>
       <view class="menu-list">
-        <view class="menu-item" @click="goToUpload">
-          <text class="menu-icon">📁</text>
-          <text class="menu-text">上传PDF</text>
+        <view class="menu-item" @click="goToShelf">
+          <text class="menu-icon">📚</text>
+          <text class="menu-text">书架首页</text>
+          <text class="menu-arrow">→</text>
+        </view>
+        <view v-if="isAdmin" class="menu-item" @click="goToUpload">
+          <text class="menu-icon">🛠</text>
+          <text class="menu-text">图书与兑换码管理</text>
           <text class="menu-arrow">→</text>
         </view>
         <view class="menu-item" @click="logout">
@@ -34,20 +41,29 @@ export default {
     isLoggedIn() {
       return this.$store.getters.isLoggedIn
     },
+    isAdmin() {
+      return this.$store.getters.isAdmin
+    },
     currentUser() {
-      return this.$store.getters.currentUser
+      return this.$store.getters.currentUser || { username: '', email: '', phone: '' }
+    },
+    avatarText() {
+      return this.currentUser.username ? this.currentUser.username.charAt(0).toUpperCase() : 'P'
     }
   },
   methods: {
     goToLogin() {
       uni.navigateTo({ url: '/pages/login/login' })
     },
+    goToShelf() {
+      uni.reLaunch({ url: '/pages/index/index' })
+    },
     goToUpload() {
       uni.navigateTo({ url: '/pages/upload/upload' })
     },
     logout() {
       this.$store.dispatch('logout')
-      uni.switchTab({ url: '/pages/login/login' })
+      uni.reLaunch({ url: '/pages/login/login' })
     }
   }
 }
@@ -114,6 +130,18 @@ export default {
 .email {
   font-size: 28rpx;
   color: #666;
+  display: block;
+  margin-top: 8rpx;
+}
+
+.role-tag {
+  display: inline-block;
+  margin-top: 16rpx;
+  padding: 8rpx 18rpx;
+  border-radius: 999rpx;
+  background: #e8f5e9;
+  color: #2e7d32;
+  font-size: 24rpx;
 }
 
 .menu-list {

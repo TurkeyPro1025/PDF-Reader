@@ -1,15 +1,24 @@
 const User = require('../models/User')
 const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
+const { validateEmail } = require('../middleware/validation')
 
 const register = async (req, res) => {
   try {
-    const { username, email, password } = req.body
+    const { username, phone, email, password } = req.body
 
     // 检查用户是否已存在
-    const existingUser = await User.findOne({ email })
-    if (existingUser) {
-      return res.status(400).json({ message: 'User already exists' })
+    const existingUser = await User.findOne({
+      $or: [
+        { phone },
+        ...(email ? [{ email }] : [])
+      ]
+    })
+    if (existingUser?.phone === phone) {
+      return res.status(400).json({ message: 'Phone number already exists' })
+    }
+    if (existingUser?.email && email && existingUser.email === email) {
+      return res.status(400).json({ message: 'Email already exists' })
     }
 
     // 哈希密码
@@ -19,23 +28,37 @@ const register = async (req, res) => {
     // 创建新用户
     const user = new User({
       username,
-      email,
+      phone,
+      email: email || undefined,
       password: hashedPassword
     })
 
     await user.save()
-    res.status(201).json({ message: 'User registered successfully' })
+    res.status(201).json({
+      message: 'User registered successfully',
+      user: {
+        id: user._id,
+        username: user.username,
+        phone: user.phone,
+        email: user.email || '',
+        role: user.role
+      }
+    })
   } catch (error) {
+    console.error('Register error:', error)
     res.status(500).json({ message: 'Server error' })
   }
 }
 
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body
+    const { account, password } = req.body
+    const query = validateEmail(account)
+      ? { email: account.toLowerCase() }
+      : { phone: account }
 
     // 检查用户是否存在
-    const user = await User.findOne({ email })
+    const user = await User.findOne(query)
     if (!user) {
       return res.status(400).json({ message: 'Invalid credentials' })
     }
@@ -46,10 +69,17 @@ const login = async (req, res) => {
       return res.status(400).json({ message: 'Invalid credentials' })
     }
 
+    // 检查JWT_SECRET配置
+    const jwtSecret = process.env.JWT_SECRET
+    if (!jwtSecret) {
+      console.error('JWT_SECRET is not configured')
+      return res.status(500).json({ message: 'Server configuration error' })
+    }
+
     // 生成token
     const token = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET || 'your-secret-key',
+      { userId: user._id, role: user.role },
+      jwtSecret,
       { expiresIn: '7d' }
     )
 
@@ -57,11 +87,14 @@ const login = async (req, res) => {
       user: {
         id: user._id,
         username: user.username,
-        email: user.email
+        phone: user.phone,
+        email: user.email || '',
+        role: user.role
       },
       token
     })
   } catch (error) {
+    console.error('Login error:', error)
     res.status(500).json({ message: 'Server error' })
   }
 }

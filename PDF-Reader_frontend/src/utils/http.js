@@ -1,4 +1,4 @@
-let DEFAULT_API_BASE_URL = 'http://127.0.0.1:3000'
+let DEFAULT_API_BASE_URL = 'http://127.0.0.1:5000'
 
 function normalizeApiBaseUrl(url) {
   if (!url) {
@@ -28,6 +28,10 @@ export function buildApiUrl(path) {
     return `${baseUrl}${path}`
   }
   return `${baseUrl}/${path}`
+}
+
+export function buildAssetUrl(path) {
+  return buildApiUrl(path)
 }
 
 export function getErrorMessage(error, fallback = '请求失败') {
@@ -94,4 +98,16 @@ export function get(url, options = {}) {
 
 export function post(url, data, options = {}) {
   return request({ ...options, url, data, method: 'POST' })
+}
+
+export function put(url, data, options = {}) {
+  return request({ ...options, url, data, method: 'PUT' })
+}
+
+export function patch(url, data, options = {}) {
+  return request({ ...options, url, data, method: 'PATCH' })
+}
+
+export function del(url, options = {}) {
+  return request({ ...options, url, method: 'DELETE' })
 }
