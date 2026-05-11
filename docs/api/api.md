@@ -1,129 +1,16 @@
-# API 文档
+# API 文档（已归档）
 
-## 认证相关接口
+此文件对应旧版“用户私有 PDF 上传”模型，接口（如 `/api/pdf/*`）已不再使用。
 
-### 注册用户
-- **URL**: `/api/auth/register`
-- **方法**: POST
-- **请求体**:
-  ```json
-  {
-    "username": "用户名",
-    "email": "邮箱地址",
-    "password": "密码"
-  }
-  ```
-- **成功响应**:
-  ```json
-  {
-    "message": "User registered successfully"
-  }
-  ```
+当前项目的权威 API 文档请使用：
 
-### 用户登录
-- **URL**: `/api/auth/login`
-- **方法**: POST
-- **请求体**:
-  ```json
-  {
-    "email": "邮箱地址",
-    "password": "密码"
-  }
-  ```
-- **成功响应**:
-  ```json
-  {
-    "user": {
-      "id": "用户ID",
-      "username": "用户名",
-      "email": "邮箱地址"
-    },
-    "token": "JWT令牌"
-  }
-  ```
+- [API_SPEC.md](./API_SPEC.md)
 
-## PDF 相关接口
+当前后端已经切换为“管理员图书库 + 用户兑换入书架”模型，核心接口为：
 
-### 上传 PDF
-- **URL**: `/api/pdf/upload`
-- **方法**: POST
-- **请求头**:
-  ```
-  Authorization: Bearer JWT令牌
-  ```
-- **请求体**: 表单数据，包含名为 `pdf` 的文件字段
-- **成功响应**:
-  ```json
-  {
-    "pdf": {
-      "_id": "PDF文件ID",
-      "filename": "存储的文件名",
-      "originalname": "原始文件名",
-      "path": "文件路径",
-      "size": 文件大小,
-      "userId": "用户ID",
-      "createdAt": "创建时间"
-    }
-  }
-  ```
+- `/api/auth/*`
+- `/api/books/*`
+- `/api/redeem-codes/*`
+- `/api/bookshelf/*`
 
-### 获取 PDF 列表
-- **URL**: `/api/pdf/list`
-- **方法**: GET
-- **请求头**:
-  ```
-  Authorization: Bearer JWT令牌
-  ```
-- **成功响应**:
-  ```json
-  {
-    "pdfs": [
-      {
-        "_id": "PDF文件ID",
-        "filename": "存储的文件名",
-        "originalname": "原始文件名",
-        "path": "文件路径",
-        "size": 文件大小,
-        "userId": "用户ID",
-        "createdAt": "创建时间"
-      },
-      ...
-    ]
-  }
-  ```
-
-### 获取单个 PDF
-- **URL**: `/api/pdf/:id`
-- **方法**: GET
-- **请求头**:
-  ```
-  Authorization: Bearer JWT令牌
-  ```
-- **成功响应**:
-  ```json
-  {
-    "pdf": {
-      "_id": "PDF文件ID",
-      "filename": "存储的文件名",
-      "originalname": "原始文件名",
-      "path": "文件路径",
-      "size": 文件大小,
-      "userId": "用户ID",
-      "createdAt": "创建时间"
-    }
-  }
-  ```
-
-### 删除 PDF
-- **URL**: `/api/pdf/:id`
-- **方法**: DELETE
-- **请求头**:
-  ```
-  Authorization: Bearer JWT令牌
-  ```
-- **成功响应**:
-  ```json
-  {
-    "message": "PDF deleted successfully"
-  }
-  ```
+如需新增或修改接口，请只更新 [API_SPEC.md](./API_SPEC.md)，避免出现多份不一致文档。
