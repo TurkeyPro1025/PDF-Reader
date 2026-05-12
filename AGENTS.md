@@ -43,7 +43,7 @@ npm run build:mp-weixin    # Production build
 | `redeemcodes` | Redemption codes (1 code per book instance) | `code`, `bookId`, `usedBy`, `usedAt`, `expiresAt` |
 | `bookshelfitems` | User's personal books + reading progress | `userId`, `bookId`, `currentPage`, `totalPages`, `lastReadAt`, `bookmarks` |
 
-See [backend/README.md](backend/README.md) for detailed schema descriptions. 
+See [docs/developer_manual.md](docs/developer_manual.md) for current development guidance and schema summary. 
 
 ### API Design Patterns
 - **Prefix:** All endpoints are `/api/...`
@@ -178,16 +178,9 @@ http.get('/api/books').then(res => { /* handle */ });
 
 ## Deployment & Operations
 
-### Pre-Deployment Checklist
-See [backend/DEPLOYMENT_PRECHECK.md](backend/DEPLOYMENT_PRECHECK.md) for database, environment, and security validations.
-
-### Production Readiness Docs
-- **MongoDB Atlas Setup:** [backend/MONGODB_ATLAS_SETUP.md](backend/MONGODB_ATLAS_SETUP.md)
-- **Domain & HTTPS:** [backend/DOMAIN_AND_HTTPS_SETUP.md](backend/DOMAIN_AND_HTTPS_SETUP.md)
-- **Security Baseline:** [backend/SECURITY_BASELINE.md](backend/SECURITY_BASELINE.md)
-- **Node.js Hosting:** [backend/HOSTED_NODE_DEPLOYMENT.md](backend/HOSTED_NODE_DEPLOYMENT.md)
-- **Operations Runbook:** [backend/OPERATIONS_RUNBOOK.md](backend/OPERATIONS_RUNBOOK.md)
-- **Business Acceptance:** [backend/BUSINESS_ACCEPTANCE_CHECKLIST.md](backend/BUSINESS_ACCEPTANCE_CHECKLIST.md)
+### Project Manuals
+- **Developer Manual:** [docs/developer_manual.md](docs/developer_manual.md)
+- **User Manual:** [docs/user/user_manual.md](docs/user/user_manual.md)
 
 ### Key Environment Variables (Backend)
 ```
@@ -210,7 +203,7 @@ PDF_READER_FRONTEND_URL=https://your-frontend-domain.com
 3. **Add gating** → Use `requireRole('admin')` in route stack
 4. **Add validation** → Define schema in `backend/middleware/validation.js`
 5. **Test** → Manual HTTP client or unit test
-6. **Document** → Update API spec in [docs/api/API_SPEC.md](docs/api/API_SPEC.md)
+6. **Document** → Update [docs/developer_manual.md](docs/developer_manual.md) when setup or developer-facing behavior changes
 
 ### Adding a New Frontend Page
 1. **Create `.vue` file** in `pages/yourpage/yourpage.vue`
@@ -259,9 +252,8 @@ PDF_READER_FRONTEND_URL=https://your-frontend-domain.com
 ## Related Documentation
 
 - **User Manual:** [docs/user/user_manual.md](docs/user/user_manual.md)
-- **API Specification:** [docs/api/API_SPEC.md](docs/api/API_SPEC.md)
-- **Backend Troubleshooting:** [backend/README.md](backend/README.md)
-- **Frontend Setup:** [PDF-Reader_frontend/README.md](PDF-Reader_frontend/README.md)
+- **Developer Manual:** [docs/developer_manual.md](docs/developer_manual.md)
+- **User Manual:** [docs/user/user_manual.md](docs/user/user_manual.md)
 
 ---
 
